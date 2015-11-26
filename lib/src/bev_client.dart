@@ -28,16 +28,34 @@ class BevClient {
     };
   }
 
-  Future<List<String>> getDatapoints() async {
-    if (_dataPoints != null) {
-      return _dataPoints;
+  Future<List<String>> getDatapoints({force: false}) async {
+    if (_dataPoints == null || force) {
+      var jsonMap = await _getRequest(rootUri);
+      _dataPoints = jsonMap['hrefs'];
     }
+    return _dataPoints;
+  }
 
-    var req = await _client.getUrl(rootUri);
+  Future<List> getData(String url) async {
+    var uri = Uri.parse(url);
+    var jsonMap = await _getRequest(uri);
+
+    return jsonMap['datapoints'];
+  }
+
+  Future<Map> _getRequest(Uri uri) async {
+    var req = await _client.getUrl(uri);
     var resp = await req.close();
     var body = await resp.transform(UTF8.decoder).join();
-    var jsonMap = JSON.decode(body);
-    return jsonMap['hrefs'];
+    Map result;
+    try {
+      result = JSON.decode(body);
+    } catch (e, stack) {
+      print('Error decoding: ${e.message}');
+      print(stack);
+      return {'datapoints': []};
+    }
+    return result;
   }
 
   // Force the connection to close.

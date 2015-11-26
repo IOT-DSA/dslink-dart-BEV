@@ -4,10 +4,10 @@ import 'dart:async';
 
 import 'package:dslink/responder.dart';
 
-import 'package:dslink_bev/src/BevClient.dart';
+import 'package:dslink_bev/src/bev_client.dart';
 import 'package:dslink_bev/link_manager.dart';
 
-part 'src/BevNode.dart';
+part 'src/bev_node.dart';
 
 class AddConnectionNode extends SimpleNode {
   static final String isType = 'addConnection';
@@ -111,5 +111,31 @@ class RemoveConnectionNode extends SimpleNode {
     var p = parent.path;
     provider.removeNode(p);
     return {};
+  }
+}
+
+class RefreshConnectionNode extends SimpleNode {
+  static final String isType = 'refreshConnection';
+  static String pathName() => 'Refresh_Connection';
+  static Map definition() => {
+    r'$is' : isType,
+    r'$name': 'Refresh Nodes',
+    r'$invokable' : 'write',
+    r'$results' : 'values',
+    r'$params' : [],
+    r'$columns' : []
+  };
+
+  RefreshConnectionNode(String path) : super(path);
+
+  @override
+  dynamic onInvoke(Map<String, dynamic> params) {
+    var p = parent;
+    for (var child in p.children.values) {
+      if (child.getConfig(r'$invokable') != 'write') continue;
+      parent.removeChild(child);
+    }
+
+    (parent as BevNode).loadData(force: true);
   }
 }
