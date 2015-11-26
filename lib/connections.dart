@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:dslink/responder.dart';
 
 import 'package:dslink_bev/src/BevClient.dart';
+import 'package:dslink_bev/link_manager.dart';
 
 part 'src/BevNode.dart';
 
@@ -78,13 +79,16 @@ class AddConnectionNode extends SimpleNode {
       };
     }
 
-    provider.addNode('/${BevNode.pathName(uri)}',
+    provider.addNode('/${params['name']}',
         BevNode.definition(params['username'], params['password'], url));
 
+    var lm = new LinkManager();
+    lm.save();
     return {
       'success' : true,
       'message' : 'Added Successfully'
     };
+
   }
 }
 
@@ -96,7 +100,8 @@ class RemoveConnectionNode extends SimpleNode {
     r'$name' : 'Remove Connection',
     r'$invokable' : 'write',
     r'$result' : 'values',
-    r'$params' : []
+    r'$params' : [],
+    r'$columns' : []
   };
 
   RemoveConnectionNode(String path) : super(path);
