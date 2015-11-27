@@ -62,7 +62,7 @@ class BevNode extends SimpleNode {
             tempVal =
                 NodeNamer.createName(sanitize(str.substring(start + 1, index)));
             start = index;
-            map[tempVal] ??= new Map();
+            map.putIfAbsent(tempVal, () => new Map());
             map = map[tempVal];
           }
           index++;
@@ -96,7 +96,7 @@ class BevNode extends SimpleNode {
     });
 
     var lm = new LinkManager();
-    lm?.save();
+    if (lm != null) lm.save();
   }
 
   @override
@@ -113,16 +113,16 @@ class BevNode extends SimpleNode {
       for (var data in result) {
         var encoded = data['id'].replaceAll(',', '%2C');
         var node = _subscribed[encoded];
-        node?.receiveData(data);
+        if (node != null) node.receiveData(data);
       }
       var lm = new LinkManager();
-      lm?.save();
+      if (lm != null) lm.save();
       _isRefreshing = false;
     });
   }
 
   void addSubscribed(BevValueNode node) {
-    _subscribed[node.id] ??= node;
+    _subscribed.putIfAbsent(node.id, () => node);
   }
 
   void removeSubscribed(BevValueNode node) {
@@ -158,7 +158,7 @@ class BevValueNode extends SimpleNode {
 
   @override
   void onUnsubscribe() {
-    _myParent?.removeSubscribed(this);
+    if (_myParent != null) _myParent.removeSubscribed(this);
   }
 
   @override

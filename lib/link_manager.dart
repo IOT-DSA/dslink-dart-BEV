@@ -9,7 +9,7 @@ class LinkManager {
 
   factory LinkManager([LinkProvider link]) {
     if (_cache == null && link != null) {
-      _cache ??= new LinkManager._(link);
+      _cache = new LinkManager._(link);
     }
     return _cache;
   }

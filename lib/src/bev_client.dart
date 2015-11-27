@@ -22,7 +22,8 @@ class BevClient {
   List<String> _dataPoints;
 
   factory BevClient(String username, String password, Uri rootUri) =>
-      _cache[rootUri.toString()] ??= new BevClient._(username, password, rootUri);
+      _cache.putIfAbsent(rootUri.toString(),
+          () => new BevClient._(username, password, rootUri));
 
   BevClient._(this.username, this.password, this.rootUri) {
     _client = new HttpClient();
