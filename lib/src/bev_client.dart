@@ -37,10 +37,17 @@ class BevClient {
   }
 
   Future<List> getData(String url) async {
-    var uri = Uri.parse(url);
+    var uri = Uri.parse('${rootUri.toString()}$url');
     var jsonMap = await _getRequest(uri);
 
     return jsonMap['datapoints'];
+  }
+
+  Future<List> getMultiData(Iterable<String> ids) async {
+    var queryStr = '?ids=${ids.join(',')}';
+    var uri = Uri.parse('${rootUri.toString()}$queryStr');
+    var map = await _getRequest(uri);
+    return map['datapoints'];
   }
 
   Future<Map> _getRequest(Uri uri) async {
@@ -51,8 +58,9 @@ class BevClient {
     try {
       result = JSON.decode(body);
     } catch (e, stack) {
-      print('Error decoding: ${e.message}');
-      print(stack);
+      print('Error decoding response: ${e.message}');
+      print('Address was: $uri');
+      print('Response was: $body');
       return {'datapoints': []};
     }
     return result;

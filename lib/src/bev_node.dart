@@ -2,11 +2,12 @@ part of dslink.bev.connections;
 
 class BevNode extends SimpleNode {
   static final String isType = 'bevNode';
-  static Map definition(String username, String password, String rootUri) => {
+  static Map definition(Map parameters, String url) => {
     r'$is' : isType,
-    r'$$bev_user' : username,
-    r'$$bev_pass' : password,
-    r'$$bev_url' : rootUri,
+    r'$$bev_user' : parameters['username'],
+    r'$$bev_pass' : parameters['password'],
+    r'$$bev_url' : url,
+    r'$$bev_refresh' : parameters['refreshRate'],
     RemoveConnectionNode.pathName() : RemoveConnectionNode.definition(),
     RefreshConnectionNode.pathName() : RefreshConnectionNode.definition()
   };
@@ -14,15 +15,27 @@ class BevNode extends SimpleNode {
   String _username;
   String _password;
   String _rootUri;
-  BevClient client;
+  bool _isRefreshing = false;
+  HashMap<String, BevValueNode> _subscribed;
 
-  BevNode(String path) : super(path);
+  BevClient client;
+  Timer refresh;
+
+  BevNode(String path) : super(path) {
+    _subscribed = new HashMap<String, BevValueNode>();
+  }
 
   @override
   void onCreated() {
     _username = getConfig(r'$$bev_user');
     _password = getConfig(r'$$bev_pass');
     _rootUri = getConfig(r'$$bev_url');
+
+    if (refresh == null) {
+      var rTime = int.parse(getConfig(r'$$bev_refresh'), onError: (_) => 60);
+      refresh = new Timer.periodic(new Duration(seconds: rTime), _refreshData);
+    }
+
     client = new BevClient(_username, _password, Uri.parse(_rootUri));
     loadData();
   }
@@ -30,9 +43,9 @@ class BevNode extends SimpleNode {
   Future loadData({force: false}) async {
     Map allNodes = {};
 
-    generateNode(String uri, String fullUrl) {
+    generateNode(String uri) {
       var map = allNodes;
-      String str = Uri.decodeComponent(uri);
+      String str = uri;//Uri.decodeComponent(uri);
       String tempVal;
       var index = 1;
       var start = 0;
@@ -42,16 +55,16 @@ class BevNode extends SimpleNode {
         StringBuffer b = new StringBuffer();
         for (var i = 0; i < s.length; i++) {
           switch (s[i]) {
-            case ' ':
-            case '-':
-              b.write('_');
-              break;
+            //case ' ':
+            //case '-':
+            //  b.write('_');
+            //  break;
             case '/':
             case '|':
             case ':':
             case r'$':
             case ';':
-            case '%':
+            //case '%':
               break;
             default:
               b.write(s[i]);
@@ -75,74 +88,103 @@ class BevNode extends SimpleNode {
           index++;
         }
       } catch (e) {
-        print('ERROR: ${e.message}');
-        print('URI: $uri');
+
       }
       tempVal = sanitize(str.substring(start + 1));
       map[tempVal] = {
         r'$is' : BevValueNode.isType,
         r'$type' : 'string',
-        r'$name' : tempVal,
+        r'$name' : Uri.decodeComponent(tempVal),
         r'?value' : '',
-        r'$$bev_url' : fullUrl
+        r'$$bev_url' : uri
       };
     }
 
     var data = await client.getDatapoints(force: force);
-    for (var url in data) {
-      var item = url.split('api/v1/datapoints');
-      generateNode(item[1], '$_rootUri${item[1]}');
+    if (data == null || data.length < 1) {
+      remove();
+      return;
     }
 
-    print(allNodes);
+    for (var url in data) {
+      var item = url.split('api/v1/datapoints');
+      generateNode(item[1]);
+    }
+
     allNodes.forEach((key, val) {
       provider.addNode('$path/$key', val);
     });
-    print('added nodes');
   }
 
   @override
   void onRemoving() {
     client.close();
   }
+
+  void _refreshData(Timer t) {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    var keys = _subscribed.keys;
+    if (keys.length < 1) return;
+    client.getMultiData(keys).then((List result) {
+      for (var data in result) {
+        var node = _subscribed[data['id']];
+        node?.receiveData(data);
+      }
+      _isRefreshing = false;
+    });
+  }
+
+  void addSubscribed(BevValueNode node) {
+    _subscribed[node.id] ??= node;
+  }
+
+  void removeSubscribed(BevValueNode node) {
+    _subscribed.remove(node.id);
+  }
+
 }
 
 class BevValueNode extends SimpleNode {
   static const String isType = 'bevValue';
 
+  String get id => _uri;
   String _uri;
   BevClient _client;
+  BevNode _myParent;
 
   BevValueNode(String path) : super(path);
 
   void onSubscribe() {
-    if (_client == null) {
+    if (_myParent == null) {
       var tmp = parent;
       while (tmp is! BevNode) {
         tmp = tmp.parent;
       }
+      _myParent = tmp;
       _client = tmp.client;
+      _myParent.addSubscribed(this);
     }
 
     getData();
+  }
+
+  @override
+  void onUnsubscribe() {
+    _myParent?.removeSubscribed(this);
   }
 
   void onCreated() {
     _uri = getConfig(r'$$bev_url');
   }
 
-  Future getData() async {
-    var dataList = await _client.getData(_uri);
-    print(dataList);
-    if (dataList.isEmpty) return;
-    var data = dataList[0];
-
+  void receiveData(Map data) {
     var value;
     switch (data['type']) {
       case 'DATE_TIME':
         var tmp = int.parse(data['value'], onError: (_) => -1);
         value = (tmp == -1 ? 'Error' :
-                new DateTime.fromMillisecondsSinceEpoch(tmp).toIso8601String());
+        new DateTime.fromMillisecondsSinceEpoch(tmp).toIso8601String());
         break;
       case 'DOUBLE' :
         value = double.parse(data['value']);
@@ -160,5 +202,13 @@ class BevValueNode extends SimpleNode {
         value = data['value'];
     }
     updateValue(value);
+  }
+
+  Future getData() async {
+    var dataList = await _client.getData(_uri);
+    if (dataList.isEmpty) return;
+    var data = dataList[0];
+
+    receiveData(data);
   }
 }

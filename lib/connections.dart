@@ -1,6 +1,7 @@
 library dslink.bev.connections;
 
 import 'dart:async';
+import 'dart:collection' show HashMap;
 
 import 'package:dslink/responder.dart';
 
@@ -35,6 +36,11 @@ class AddConnectionNode extends SimpleNode {
       {
         'name' : 'url',
         'type' : 'string'
+      },
+      {
+        'name' : 'refreshRate',
+        'type' : 'int',
+        'default' : 30
       }
     ],
     r'$columns' : [
@@ -80,7 +86,7 @@ class AddConnectionNode extends SimpleNode {
     }
 
     provider.addNode('/${params['name']}',
-        BevNode.definition(params['username'], params['password'], url));
+        BevNode.definition(params, url));
 
     var lm = new LinkManager();
     lm.save();
