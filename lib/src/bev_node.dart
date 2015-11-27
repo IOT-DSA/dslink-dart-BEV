@@ -111,7 +111,8 @@ class BevNode extends SimpleNode {
     if (keys.length < 1) return;
     client.getBatchData(keys).then((List result) {
       for (var data in result) {
-        var node = _subscribed[data['id']];
+        var encoded = data['id'].replaceAll(',', '%2C');
+        var node = _subscribed[encoded];
         node?.receiveData(data);
       }
       var lm = new LinkManager();
