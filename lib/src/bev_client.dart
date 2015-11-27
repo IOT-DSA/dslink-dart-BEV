@@ -43,7 +43,7 @@ class BevClient {
     return jsonMap['datapoints'];
   }
 
-  Future<List> getMultiData(Iterable<String> ids) async {
+  Future<List> getBatchData(Iterable<String> ids) async {
     var queryStr = '?ids=${ids.join(',')}';
     var uri = Uri.parse('${rootUri.toString()}$queryStr');
     var map = await _getRequest(uri);

@@ -45,34 +45,13 @@ class BevNode extends SimpleNode {
 
     generateNode(String uri) {
       var map = allNodes;
-      String str = uri;//Uri.decodeComponent(uri);
+      String str = Uri.decodeComponent(uri);
       String tempVal;
       var index = 1;
       var start = 0;
       bool done() => index >= str.length;
 
-      String sanitize(String s) {
-        StringBuffer b = new StringBuffer();
-        for (var i = 0; i < s.length; i++) {
-          switch (s[i]) {
-            //case ' ':
-            //case '-':
-            //  b.write('_');
-            //  break;
-            case '/':
-            case '|':
-            case ':':
-            case r'$':
-            case ';':
-            //case '%':
-              break;
-            default:
-              b.write(s[i]);
-              break;
-          }
-        }
-        return b.toString();
-      }
+      String sanitize(String s) => s.replaceAll('/', '');
 
       try {
         while (!done()) {
@@ -80,7 +59,8 @@ class BevNode extends SimpleNode {
             while (!done() && str[index] != ')') index++;
           }
           if (!done() && str[index] == '/') {
-            tempVal = sanitize(str.substring(start + 1, index));
+            tempVal =
+                NodeNamer.createName(sanitize(str.substring(start + 1, index)));
             start = index;
             map[tempVal] ??= new Map();
             map = map[tempVal];
@@ -91,12 +71,12 @@ class BevNode extends SimpleNode {
 
       }
       tempVal = sanitize(str.substring(start + 1));
-      map[tempVal] = {
+      map[NodeNamer.createName(tempVal)] = {
         r'$is' : BevValueNode.isType,
         r'$type' : 'string',
-        r'$name' : Uri.decodeComponent(tempVal),
+        r'$name' : tempVal,
         r'?value' : '',
-        r'$$bev_url' : uri
+        r'$$bev_url' : uri.replaceAll(',', '%2C')
       };
     }
 
