@@ -94,6 +94,9 @@ class BevNode extends SimpleNode {
     allNodes.forEach((key, val) {
       provider.addNode('$path/$key', val);
     });
+
+    var lm = new LinkManager();
+    lm?.save();
   }
 
   @override
@@ -111,6 +114,8 @@ class BevNode extends SimpleNode {
         var node = _subscribed[data['id']];
         node?.receiveData(data);
       }
+      var lm = new LinkManager();
+      lm?.save();
       _isRefreshing = false;
     });
   }
