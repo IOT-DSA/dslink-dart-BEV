@@ -131,6 +131,7 @@ class BevNode extends SimpleNode {
 
 }
 
+
 class BevValueNode extends SimpleNode {
   static const String isType = 'bevValue';
 
@@ -165,6 +166,8 @@ class BevValueNode extends SimpleNode {
     _uri = getConfig(r'$$bev_url');
   }
 
+  /// Called when value is Set. Will trigger request to the REST server
+  /// for this value to `PUT` this value.
   @override
   bool onSetValue(dynamic val) {
     _client.setData(_uri, val).then((result) {
@@ -174,6 +177,9 @@ class BevValueNode extends SimpleNode {
     return false;
   }
 
+  /// Process received data map [data]. Convert date/time stamps to
+  /// ISO8601 strings. `DOUBLE`, `BOOLEAN`, and `INTEGER` will be converted
+  /// to their specified types. Other values are updated as Strings.
   void receiveData(Map data) {
     var value;
     switch (data['type']) {
@@ -204,6 +210,7 @@ class BevValueNode extends SimpleNode {
     updateValue(value);
   }
 
+  /// Query the URI for this value from the server.
   Future getData() async {
     var dataList = await _client.getData(_uri);
     if (dataList.isEmpty) return;

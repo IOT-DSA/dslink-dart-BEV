@@ -4,11 +4,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dslink/utils.dart' show logger;
+
+/// Client which handles communication to the REST server.
 class BevClient {
   static final Map<String, BevClient> _cache = <String, BevClient>{};
 
+  /// HTTP Digest Authentication Username
   final String username;
+  /// HTTP Digest Authentication Username
   final String password;
+  /// Root URI for requests. Each requested is appended to this value.
   final Uri rootUri;
 
   HttpClient _client;
@@ -28,7 +34,10 @@ class BevClient {
     };
   }
 
-  Future<List<String>> getDatapoints({force: false}) async {
+  /// Query the [rootUri] for available datapoints on this connection.
+  /// If [force] is `true` then it will force a new query to the server.
+  /// If [force] is `false` (default value) then it may returned cached values.
+  Future<List<String>> getDatapoints({bool force: false}) async {
     if (_dataPoints == null || force) {
       var jsonMap = await _getRequest(rootUri);
       _dataPoints = jsonMap['hrefs'];
@@ -36,6 +45,9 @@ class BevClient {
     return _dataPoints;
   }
 
+  /// Perform a `GET` request on the specified url fragment. Fragment will be
+  /// appended to the client's [rootUri] to query.
+  /// Returns a Future list of map values returned from the server.
   Future<List> getData(String url) async {
     var uri = Uri.parse('${rootUri.toString()}$url');
     var jsonMap = await _getRequest(uri);
@@ -43,6 +55,8 @@ class BevClient {
     return jsonMap['datapoints'];
   }
 
+  /// Perform a `GET` request for multiple URL fragments. Multiple values will
+  /// be requested simultaneously. Returns a future list of map values.
   Future<List> getBatchData(Iterable<String> ids) async {
     var queryStr = '?ids=${ids.join(',')}';
     var uri = Uri.parse('${rootUri.toString()}$queryStr');
@@ -50,6 +64,9 @@ class BevClient {
     return map['datapoints'];
   }
 
+  /// Perform a `PUT` request for the specified URL fragment. The specified
+  /// [value] will be sent with ContentType Application/json; charset=utf-8.
+  /// Returns a future list of map values for the response.
   Future<List> setData(String url, dynamic value) async {
     var body = JSON.encode({'value' : value});
     var uri = Uri.parse('${rootUri.toString()}$url');
@@ -65,10 +82,9 @@ class BevClient {
     try {
       result = JSON.decode(body);
     } catch (e) {
-      // TODO: Convert to logger
-      print('Error decoding response: ${e.message}');
-      print('Address was: $uri');
-      print('Response was: $body');
+      logger.warning('Unable to decode response', e);
+      logger.fine('Address was: $uri');
+      logger.fine('Response was: $body');
       return {'datapoints': []};
     }
     return result;
@@ -84,15 +100,14 @@ class BevClient {
     try {
       result = JSON.decode(body);
     } catch (e) {
-      // TODO: Convert to logger
-      print('Error decoding response: ${e.message}');
-      print('Address was: $uri');
-      print('Response was: $body');
+      logger.warning('Unable to decode response', e);
+      logger.fine('Address was: $uri');
+      logger.fine('Response was: $body');
       return {'datapoints': []};
     }
     return result;
   }
 
-  // Force the connection to close.
+  /// Force the connection to close.
   void close() => _client.close(force: true);
 }
