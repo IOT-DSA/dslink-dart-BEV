@@ -109,7 +109,7 @@ class BevNode extends SimpleNode {
     _isRefreshing = true;
     var keys = _subscribed.keys;
     if (keys.length < 1) return;
-    client.getMultiData(keys).then((List result) {
+    client.getBatchData(keys).then((List result) {
       for (var data in result) {
         var node = _subscribed[data['id']];
         node?.receiveData(data);
@@ -159,8 +159,18 @@ class BevValueNode extends SimpleNode {
     _myParent?.removeSubscribed(this);
   }
 
+  @override
   void onCreated() {
     _uri = getConfig(r'$$bev_url');
+  }
+
+  @override
+  bool onSetValue(dynamic val) {
+    _client.setData(_uri, val).then((result) {
+      if (result.length < 1) return;
+      receiveData(result[0]);
+    });
+    return false;
   }
 
   void receiveData(Map data) {
@@ -186,6 +196,10 @@ class BevValueNode extends SimpleNode {
       default:
         value = data['value'];
     }
+    if (data['readonly'] != null && data['readonly'] == 'false') {
+      writable = 'write';
+    }
+
     updateValue(value);
   }
 

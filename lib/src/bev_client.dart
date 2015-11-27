@@ -50,6 +50,13 @@ class BevClient {
     return map['datapoints'];
   }
 
+  Future<List> setData(String url, dynamic value) async {
+    var body = JSON.encode({'value' : value});
+    var uri = Uri.parse('${rootUri.toString()}$url');
+    var map = await _setRequest(uri, body);
+    return map['datapoints'];
+  }
+
   Future<Map> _getRequest(Uri uri) async {
     var req = await _client.getUrl(uri);
     var resp = await req.close();
@@ -57,7 +64,27 @@ class BevClient {
     Map result;
     try {
       result = JSON.decode(body);
-    } catch (e, stack) {
+    } catch (e) {
+      // TODO: Convert to logger
+      print('Error decoding response: ${e.message}');
+      print('Address was: $uri');
+      print('Response was: $body');
+      return {'datapoints': []};
+    }
+    return result;
+  }
+
+  Future<Map> _setRequest(Uri uri, String data) async {
+    var req = await _client.putUrl(uri);
+    req.headers.contentType = ContentType.JSON;
+    req.write(data);
+    var resp = await req.close();
+    var body = await resp.transform(UTF8.decoder).join();
+    Map result;
+    try {
+      result = JSON.decode(body);
+    } catch (e) {
+      // TODO: Convert to logger
       print('Error decoding response: ${e.message}');
       print('Address was: $uri');
       print('Response was: $body');
