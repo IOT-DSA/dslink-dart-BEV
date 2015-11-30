@@ -13,6 +13,7 @@ Future main(List<String> args) async {
     AddConnectionNode.isType : (String path) => new AddConnectionNode(path),
     RemoveConnectionNode.isType : (String path) => new RemoveConnectionNode(path),
     RefreshConnectionNode.isType : (String path) => new RefreshConnectionNode(path),
+    EditConnectionNode.isType : (String path) => new EditConnectionNode(path),
     BevNode.isType : (String path) => new BevNode(path),
     BevValueNode.isType : (String path) => new BevValueNode(path)
   }, encodePrettyJson: true);

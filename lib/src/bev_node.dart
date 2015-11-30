@@ -9,20 +9,24 @@ class BevNode extends SimpleNode {
     r'$$bev_url' : url,
     r'$$bev_refresh' : parameters['refreshRate'],
     RemoveConnectionNode.pathName() : RemoveConnectionNode.definition(),
-    RefreshConnectionNode.pathName() : RefreshConnectionNode.definition()
+    RefreshConnectionNode.pathName() : RefreshConnectionNode.definition(),
+    EditConnectionNode.pathName() : EditConnectionNode.definition(url, parameters)
   };
 
   String _username;
   String _password;
   String _rootUri;
+  int _refreshRate;
   bool _isRefreshing = false;
-  HashMap<String, BevValueNode> _subscribed;
+  Set<BevValueNode> _subscribed;
+  //HashMap<String, BevValueNode> _subscribed;
 
   BevClient client;
-  Timer refresh;
+  Timer refreshTimer;
 
   BevNode(String path) : super(path) {
-    _subscribed = new HashMap<String, BevValueNode>();
+    //_subscribed = new HashMap<String, BevValueNode>();
+    _subscribed = new Set<BevValueNode>();
   }
 
   @override
@@ -31,13 +35,32 @@ class BevNode extends SimpleNode {
     _password = getConfig(r'$$bev_pass');
     _rootUri = getConfig(r'$$bev_url');
 
-    if (refresh == null) {
-      var rTime = int.parse(getConfig(r'$$bev_refresh'), onError: (_) => 60);
-      refresh = new Timer.periodic(new Duration(seconds: rTime), _refreshData);
+    _refreshRate = int.parse(getConfig(r'$$bev_refresh'), onError: (_) => 30);
+    if (refreshTimer == null) {
+      refreshTimer =
+          new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
     }
 
     client = new BevClient(_username, _password, Uri.parse(_rootUri));
     loadData();
+  }
+
+  void updateConfig(String url, String username, String password, int refresh) {
+    _username = username;
+    _password = password;
+    _rootUri = url;
+    configs[r'$$bev_user'] = _username;
+    configs[r'$$bev_pass'] = _password;
+    configs[r'$$bev_url'] = _rootUri;
+    configs[r'$$bev_refresh'] = refresh;
+
+    client.updateClient(_username, _password, Uri.parse(_rootUri));
+
+    if (refresh != _refreshRate) {
+      refreshTimer.cancel();
+      refreshTimer =
+          new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
+    }
   }
 
   Future loadData({force: false}) async {
@@ -104,20 +127,25 @@ class BevNode extends SimpleNode {
   void _refreshData(Timer t) {
     if (_isRefreshing) return;
     _isRefreshing = true;
-    var keys = _subscribed.keys;
-    if (keys.length < 1) return;
-    client.getBatchData(keys).then((List result) {
-      for (var data in result) {
-        var encoded = data['id'].replaceAll(',', '%2C');
-        var node = _subscribed[encoded];
-        if (node != null) node.receiveData(data);
-      }
+    List<Future> waitFor = new List<Future>();
+    if (_subscribed.length < 1) return;
+    for (var el in _subscribed) {
+      waitFor.add(client.queueRequest(el.id).then((result) {
+          if (result.isEmpty) {
+            el.receiveData(null);
+          } else {
+            el.receiveData(result[0]);
+          }
+        })
+      );
+    }
+    Future.wait(waitFor).then((_) {
       _isRefreshing = false;
     });
   }
 
   void addSubscribed(BevValueNode node) {
-    _subscribed.putIfAbsent(node.id, () => node);
+    _subscribed.add(node);
   }
 
   void removeSubscribed(BevValueNode node) {
@@ -177,6 +205,10 @@ class BevValueNode extends SimpleNode {
   /// to their specified types. Other values are updated as Strings.
   void receiveData(Map data) {
     var value;
+    if (data == null) {
+      updateValue(null);
+      return;
+    }
     switch (data['type']) {
       case 'DATE_TIME':
         var tmp = int.parse(data['value'], onError: (_) => -1);
@@ -184,11 +216,11 @@ class BevValueNode extends SimpleNode {
         new DateTime.fromMillisecondsSinceEpoch(tmp).toIso8601String());
         break;
       case 'DOUBLE' :
-        value = double.parse(data['value']);
+        value = double.parse(data['value'], (_) => null);
         type = 'double';
         break;
       case 'INTEGER' :
-        value = int.parse(data['value']);
+        value = int.parse(data['value'], onError: (_) => null);
         type = 'int';
         break;
       case 'BOOLEAN' :
@@ -207,7 +239,7 @@ class BevValueNode extends SimpleNode {
 
   /// Query the URI for this value from the server.
   Future getData() async {
-    var dataList = await _client.getData(_uri);
+    var dataList = await _client.queueRequest(_uri);
     if (dataList.isEmpty) return;
     var data = dataList[0];
 

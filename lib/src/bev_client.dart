@@ -2,6 +2,7 @@ library dslink.bev.client;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:collection' show Queue;
 import 'dart:io';
 
 import 'package:dslink/utils.dart' show logger;
@@ -17,15 +18,20 @@ class BevClient {
   /// Root URI for requests. Each requested is appended to this value.
   final Uri rootUri;
 
+  bool _requestPending = false;
+  Completer _requestCompleter;
   HttpClient _client;
   HttpClientDigestCredentials _auth;
   List<String> _dataPoints;
+  Queue<PendingRequest> _pendingRequests;
+  List<Future<List>> _currentRequests;
 
   factory BevClient(String username, String password, Uri rootUri) =>
       _cache.putIfAbsent(rootUri.toString(),
           () => new BevClient._(username, password, rootUri));
 
   BevClient._(this.username, this.password, this.rootUri) {
+    _pendingRequests = new Queue<PendingRequest>();
     _client = new HttpClient();
     _auth = new HttpClientDigestCredentials(username, password);
 
@@ -75,10 +81,26 @@ class BevClient {
     return map['datapoints'];
   }
 
+  BevClient updateClient(String username, String password, Uri uri) {
+    close();
+    _cache.remove(this.rootUri.toString());
+    return new BevClient(username,password, uri);
+  }
+
   Future<Map> _getRequest(Uri uri) async {
-    var req = await _client.getUrl(uri);
-    var resp = await req.close();
-    var body = await resp.transform(UTF8.decoder).join();
+    HttpClientRequest req;
+    HttpClientResponse resp;
+    String body;
+
+    try {
+      req = await _client.getUrl(uri);
+      resp = await req.close();
+      body = await resp.transform(UTF8.decoder).join();
+    } on HttpException catch (e) {
+      logger.warning('Unable to connect to: $uri', e);
+      return {'datapoints': []};
+    }
+
     Map result;
     try {
       result = JSON.decode(body);
@@ -109,6 +131,56 @@ class BevClient {
     return result;
   }
 
+  Future<List> queueRequest(String url) {
+    var pr = new PendingRequest(url);
+    _pendingRequests.add(pr);
+    if (_requestPending == false) {
+      sendRequests();
+    }
+    return pr.done;
+  }
+
+  sendRequests() {
+    _requestPending = true;
+    var pollFor = (_pendingRequests.length < 10 ? _pendingRequests.length : 10);
+    print('PollFor: $pollFor');
+    if (pollFor == 0) {
+      _requestPending = false;
+      return;
+    } else if (pollFor == 1) {
+      var pr = _pendingRequests.removeFirst();
+      getData(pr.url).then((result) {
+        pr._completer.complete(result);
+        sendRequests();
+      });
+    } else {
+      List pendingList = [];
+      for (var i = 0; i < pollFor; i++) {
+        pendingList.add(_pendingRequests.removeFirst());
+      }
+      getBatchData(pendingList.map((el) => el.url)).then((List<Map> results) {
+        for (PendingRequest pr in pendingList) {
+          var map = results.where((Map m) => m['id'] == pr.url).toList();
+          pr._completer.complete(map);
+        }
+
+        sendRequests();
+      });
+    }
+
+  }
+
   /// Force the connection to close.
   void close() => _client.close(force: true);
+}
+
+class PendingRequest {
+  Completer<List> _completer;
+  String url;
+
+  Future get done => _completer.future;
+
+  PendingRequest(this.url) {
+    _completer = new Completer<List>();
+  }
 }

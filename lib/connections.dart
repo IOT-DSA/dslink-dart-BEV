@@ -26,6 +26,11 @@ class AddConnectionNode extends SimpleNode {
         'type' : 'string'
       },
       {
+        'name' : 'url',
+        'type' : 'string',
+        'placeholder' : 'http://youraddress.com'
+      },
+      {
         'name' : 'username',
         'type' : 'string'
       },
@@ -33,10 +38,6 @@ class AddConnectionNode extends SimpleNode {
         'name' : 'password',
         'type' : 'string',
         'editor' : 'password'
-      },
-      {
-        'name' : 'url',
-        'type' : 'string'
       },
       {
         'name' : 'refreshRate',
@@ -62,28 +63,36 @@ class AddConnectionNode extends SimpleNode {
 
   @override
   Future<Map> onInvoke(Map<String, dynamic> params) async {
-    if (params['username'] == null || params['password'] == null ||
-        params['url'] == null) {
-      return {
-        'success' : false,
-        'message' : 'Invalid Credentials'
-      };
-    }
+    var ret = { 'success' : true, 'message' : ''};
 
-    String url = params['url'].trim();
+    if (params['username'] == null || params['username'] == '') {
+      ret['success'] = false;
+      ret['message'] = 'Invalid username';
+    } else if (params['password'] == null || params['password'] == '') {
+      ret['success'] = false;
+      ret['message'] = 'Invalid password';
+    } else if (params['url'] == null || params['url'] == '' ||
+        !(params['url'].startsWith('http'))) {
+      ret['success'] = false;
+      ret['message'] = 'Invalid address';
+    }
+    var url = params['url'].trim();
     if (!url.endsWith('/')) {
       url += '/';
     }
+
     url += 'api/v1/datapoints';
 
     Uri uri;
     try {
       uri = Uri.parse(params['url']);
-    } on FormatException catch (e) {
-      return {
-        'success' : false,
-        'message' : e.message
-      };
+    } catch (_) {
+      ret['success'] = false;
+      ret['message'] = 'Invalid address';
+    }
+
+    if (ret['success'] == false) {
+      return ret;
     }
 
     provider.addNode('/${params['name']}',
@@ -118,6 +127,100 @@ class RemoveConnectionNode extends SimpleNode {
     var p = parent.path;
     provider.removeNode(p);
     return {};
+  }
+}
+
+class EditConnectionNode extends SimpleNode {
+  static final String isType = 'editConnection';
+  static String pathName() => 'Edit_Connection';
+  static Map definition(String url, Map param) => {
+    r'$is': isType,
+    r'$name' : 'Edit Connection',
+    r'$invokable': 'write',
+    r'$result' : 'values',
+    r'$params' : [
+      {
+        'name' : 'url',
+        'type' : 'string',
+        'default' : url.replaceFirst('/api/v1/datapoints', '')
+      },
+      {
+        'name' : 'username',
+        'type' : 'string',
+        'default' : param['username']
+      },
+      {
+        'name' : 'password',
+        'type' : 'string',
+        'editor' : 'password',
+        'default' : param['password']
+      },
+      {
+        'name' : 'refreshRate',
+        'type' : 'int',
+        'default' : param['refreshRate']
+      }
+    ],
+    r'$columns' : [
+      {
+        'name' : 'success',
+        'type' : 'bool',
+        'default' : false
+      },
+      {
+        'name' : 'message',
+        'type' : 'string',
+        'default' : ''
+      }
+    ]
+  };
+
+  EditConnectionNode(String path) : super(path);
+
+  @override
+  dynamic onInvoke(Map<String, dynamic> params) {
+    var ret = { 'success' : true, 'message' : ''};
+
+    if (params['username'] == null || params['username'] == '') {
+      ret['success'] = false;
+      ret['message'] = 'Invalid username';
+    } else if (params['password'] == null || params['password'] == '') {
+      ret['success'] = false;
+      ret['message'] = 'Invalid password';
+    } else if (params['url'] == null || params['url'] == '' ||
+        !(params['url'].startsWith('http'))) {
+      ret['success'] = false;
+      ret['message'] = 'Invalid address';
+    }
+    var url = params['url'].trim();
+    if (!url.endsWith('/')) {
+      url += '/';
+    }
+
+    url += 'api/v1/datapoints';
+
+    Uri uri;
+    try {
+      uri = Uri.parse(params['url']);
+    } catch (_) {
+      ret['success'] = false;
+      ret['message'] = 'Invalid address';
+    }
+
+    if (ret['success'] == false) {
+      return ret;
+    }
+
+//    provider.addNode('/${params['name']}',
+//        BevNode.definition(params, url));
+
+    var lm = new LinkManager();
+    lm.save();
+    return {
+      'success' : true,
+      'message' : 'Updated Successfully'
+    };
+
   }
 }
 
