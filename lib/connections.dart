@@ -125,6 +125,10 @@ class RemoveConnectionNode extends SimpleNode {
   dynamic onInvoke(Map<String, dynamic> params) {
     var p = parent.path;
     provider.removeNode(p);
+    var lm = new LinkManager();
+    if (lm != null) {
+      lm.save();
+    }
     return {};
   }
 }
@@ -210,11 +214,20 @@ class EditConnectionNode extends SimpleNode {
       return ret;
     }
 
-//    provider.addNode('/${params['name']}',
-//        BevNode.definition(params, url));
+    var p = parent as BevNode;
+    var childList = p.children.keys.toList(growable: false);
+    for (var child in childList) {
+      if (p.children[child].getConfig(r'$invokable') == 'write') {
+        continue;
+      }
+      provider.removeNode('${p.path}/$child');
+    }
 
     var lm = new LinkManager();
     lm.save();
+
+    p.loadData(force: true).then((_) {
+    });
     return {
       'success' : true,
       'message' : 'Updated Successfully'
@@ -239,13 +252,13 @@ class RefreshConnectionNode extends SimpleNode {
 
   @override
   dynamic onInvoke(Map<String, dynamic> params) {
-    var p = parent;
-    for (var child in p.children.values) {
-      if (child.getConfig(r'$invokable') != 'write') continue;
-      parent.removeChild(child);
+    var p = parent as BevNode;
+    var childList = p.children.keys.toList(growable: false);
+    for (var child in childList) {
+      if (p.children[child].getConfig(r'$invokable') == 'write') continue;
+      provider.removeNode('${p.path}/$child');
     }
-
-    (parent as BevNode).loadData(force: true);
+    p.loadData(force: true);
     return {};
   }
 }
