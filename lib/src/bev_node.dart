@@ -37,6 +37,7 @@ class BevNode extends SimpleNode {
 
     _refreshRate = int.parse(getConfig(r'$$bev_refresh'), onError: (_) => 30);
     if (refreshTimer == null) {
+      print('Refresh Rate: $_refreshRate');
       refreshTimer =
           new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
     }
@@ -45,19 +46,23 @@ class BevNode extends SimpleNode {
     loadData();
   }
 
-  void updateConfig(String url, String username, String password, int refresh) {
-    _username = username;
-    _password = password;
-    _rootUri = url;
+  void updateBevSettings(String url, Map parameters) {
+    if (_username != parameters['username'] || _password != parameters['password']
+      || url != _rootUri) {
+      _username = parameters['username'];
+      _password = parameters['passsword'];
+      _rootUri = url;
+      client.updateClient(_username, _password, Uri.parse(_rootUri));
+    }
     configs[r'$$bev_user'] = _username;
     configs[r'$$bev_pass'] = _password;
     configs[r'$$bev_url'] = _rootUri;
-    configs[r'$$bev_refresh'] = refresh;
+    configs[r'$$bev_refresh'] = parameters['refreshRate'];
 
-    client.updateClient(_username, _password, Uri.parse(_rootUri));
-
+    var refresh = int.parse(parameters['refreshRate'], onError: (_) => 30);
     if (refresh != _refreshRate) {
       refreshTimer.cancel();
+      _refreshRate = refresh;
       refreshTimer =
           new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
     }
