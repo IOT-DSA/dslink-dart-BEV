@@ -37,7 +37,6 @@ class BevNode extends SimpleNode {
 
     _refreshRate = int.parse(getConfig(r'$$bev_refresh'), onError: (_) => 30);
     if (refreshTimer == null) {
-      print('Refresh Rate: $_refreshRate');
       refreshTimer =
           new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
     }

@@ -139,7 +139,7 @@ class BevClient {
 
   void _sendRequests() {
     _requestPending = true;
-    var pollFor = (_pendingRequests.length < 20 ? _pendingRequests.length : 20);
+    var pollFor = (_pendingRequests.length < 15 ? _pendingRequests.length : 15);
     if (pollFor == 0) {
       _requestPending = false;
       return;

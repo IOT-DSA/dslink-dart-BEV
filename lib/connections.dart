@@ -213,10 +213,8 @@ class EditConnectionNode extends SimpleNode {
     if (ret['success'] == false) {
       return ret;
     }
-    print('Parent: $parent');
     var p = parent as BevNode;
     var childList = p.children.keys.toList(growable: false);
-    print('Cleaing up children');
     for (var child in childList) {
       if (p.children[child].getConfig(r'$invokable') == 'write') {
         continue;
