@@ -19,12 +19,10 @@ class BevClient {
   final Uri rootUri;
 
   bool _requestPending = false;
-  Completer _requestCompleter;
   HttpClient _client;
   HttpClientDigestCredentials _auth;
   List<String> _dataPoints;
   Queue<PendingRequest> _pendingRequests;
-  List<Future<List>> _currentRequests;
 
   factory BevClient(String username, String password, Uri rootUri) =>
       _cache.putIfAbsent(rootUri.toString(),
@@ -52,19 +50,27 @@ class BevClient {
     return _dataPoints;
   }
 
-  /// Perform a `GET` request on the specified url fragment. Fragment will be
-  /// appended to the client's [rootUri] to query.
-  /// Returns a Future list of map values returned from the server.
-  Future<List> getData(String url) async {
+  /// Add request to [url] to the current Request Queue. Returns a Future<List>
+  /// Which will be the results from the request when completed.
+  /// This adds requests to a queue to possible be batch processed with other
+  /// requests
+  Future<List> queueRequest(String url) {
+    var pr = new PendingRequest(url);
+    _pendingRequests.add(pr);
+    if (_requestPending == false) {
+      _sendRequests();
+    }
+    return pr.done;
+  }
+
+  Future<List> _getData(String url) async {
     var uri = Uri.parse('${rootUri.toString()}$url');
     var jsonMap = await _getRequest(uri);
 
     return jsonMap['datapoints'];
   }
 
-  /// Perform a `GET` request for multiple URL fragments. Multiple values will
-  /// be requested simultaneously. Returns a future list of map values.
-  Future<List> getBatchData(Iterable<String> ids) async {
+  Future<List> _getBatchData(Iterable<String> ids) async {
     var queryStr = '?ids=${ids.join(',')}';
     var uri = Uri.parse('${rootUri.toString()}$queryStr');
     var map = await _getRequest(uri);
@@ -131,40 +137,30 @@ class BevClient {
     return result;
   }
 
-  Future<List> queueRequest(String url) {
-    var pr = new PendingRequest(url);
-    _pendingRequests.add(pr);
-    if (_requestPending == false) {
-      sendRequests();
-    }
-    return pr.done;
-  }
-
-  sendRequests() {
+  void _sendRequests() {
     _requestPending = true;
     var pollFor = (_pendingRequests.length < 10 ? _pendingRequests.length : 10);
-    print('PollFor: $pollFor');
     if (pollFor == 0) {
       _requestPending = false;
       return;
     } else if (pollFor == 1) {
       var pr = _pendingRequests.removeFirst();
-      getData(pr.url).then((result) {
+      _getData(pr.url).then((result) {
         pr._completer.complete(result);
-        sendRequests();
+        _sendRequests();
       });
     } else {
       List pendingList = [];
       for (var i = 0; i < pollFor; i++) {
         pendingList.add(_pendingRequests.removeFirst());
       }
-      getBatchData(pendingList.map((el) => el.url)).then((List<Map> results) {
+      _getBatchData(pendingList.map((el) => el.url)).then((List<Map> results) {
         for (PendingRequest pr in pendingList) {
           var map = results.where((Map m) => m['id'] == pr.url).toList();
           pr._completer.complete(map);
         }
 
-        sendRequests();
+        _sendRequests();
       });
     }
 

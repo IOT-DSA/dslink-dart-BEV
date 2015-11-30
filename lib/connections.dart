@@ -1,7 +1,6 @@
 library dslink.bev.connections;
 
 import 'dart:async';
-import 'dart:collection' show HashMap;
 
 import 'package:dslink/responder.dart';
 import 'package:dslink/nodes.dart' show NodeNamer;
@@ -247,5 +246,6 @@ class RefreshConnectionNode extends SimpleNode {
     }
 
     (parent as BevNode).loadData(force: true);
+    return {};
   }
 }
