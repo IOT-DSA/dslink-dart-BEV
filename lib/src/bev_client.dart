@@ -89,7 +89,7 @@ class BevClient {
 
   BevClient updateClient(String username, String password, Uri uri) {
     close();
-    _cache.remove(this.rootUri.toString());
+    _cache.remove(rootUri.toString());
     return new BevClient(username,password, uri);
   }
 
@@ -139,7 +139,7 @@ class BevClient {
 
   void _sendRequests() {
     _requestPending = true;
-    var pollFor = (_pendingRequests.length < 10 ? _pendingRequests.length : 10);
+    var pollFor = (_pendingRequests.length < 20 ? _pendingRequests.length : 20);
     if (pollFor == 0) {
       _requestPending = false;
       return;
