@@ -109,7 +109,13 @@ class BevNode extends SimpleNode {
 
     var data = await client.getDatapoints(force: force);
     if (data == null || data.length < 1) {
-      remove();
+      logger.warning('Unable to get datapoints from: $_rootUri');
+      client.close();
+      var myChildren = children.keys.toList();
+      for (var child in myChildren) {
+        if (children[child].getConfig(r'$invokable') == 'write') continue;
+        provider.removeNode('$path/$child');
+      }
       return;
     }
 
@@ -135,6 +141,9 @@ class BevNode extends SimpleNode {
     List<Future> waitFor = new List<Future>();
 
     for (var el in _subscribed) {
+      if (el.isQueued) continue;
+
+      el.isQueued = true;
       waitFor.add(client.queueRequest(el.id).then((result) {
         if (result.isEmpty) {
           el.receiveData(null);
@@ -164,6 +173,7 @@ class BevNode extends SimpleNode {
 class BevValueNode extends SimpleNode {
   static const String isType = 'bevValue';
 
+  bool isQueued = false;
   String get id => _uri;
   String _uri;
   BevClient _client;
@@ -210,6 +220,7 @@ class BevValueNode extends SimpleNode {
   /// ISO8601 strings. `DOUBLE`, `BOOLEAN`, and `INTEGER` will be converted
   /// to their specified types. Other values are updated as Strings.
   void receiveData(Map data) {
+    isQueued = false;
     var value;
     if (data == null) {
       updateValue(null);
@@ -239,12 +250,14 @@ class BevValueNode extends SimpleNode {
     if (data['readonly'] != null && data['readonly'] == 'false') {
       writable = 'write';
     }
-
     updateValue(value);
   }
 
   /// Query the URI for this value from the server.
   Future getData() async {
+    if (isQueued) return;
+
+    isQueued = true;
     var dataList = await _client.queueRequest(_uri);
     if (dataList.isEmpty) return;
     var data = dataList[0];

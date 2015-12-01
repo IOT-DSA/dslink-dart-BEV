@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:dslink/responder.dart';
 import 'package:dslink/nodes.dart' show NodeNamer;
+import 'package:dslink/utils.dart';
 
 import 'package:dslink_bev/src/bev_client.dart';
 import 'package:dslink_bev/link_manager.dart';
