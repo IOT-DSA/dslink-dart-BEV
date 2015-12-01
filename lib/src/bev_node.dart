@@ -129,20 +129,22 @@ class BevNode extends SimpleNode {
   }
 
   void _refreshData(Timer t) {
-    if (_isRefreshing) return;
+    if (_isRefreshing || _subscribed.length < 1) return;
+
     _isRefreshing = true;
     List<Future> waitFor = new List<Future>();
-    if (_subscribed.length < 1) return;
+
     for (var el in _subscribed) {
       waitFor.add(client.queueRequest(el.id).then((result) {
-          if (result.isEmpty) {
-            el.receiveData(null);
-          } else {
-            el.receiveData(result[0]);
-          }
-        })
+        if (result.isEmpty) {
+          el.receiveData(null);
+        } else {
+          el.receiveData(result[0]);
+        }
+      })
       );
     }
+
     Future.wait(waitFor).then((_) {
       _isRefreshing = false;
     });
@@ -153,7 +155,7 @@ class BevNode extends SimpleNode {
   }
 
   void removeSubscribed(BevValueNode node) {
-    _subscribed.remove(node.id);
+    _subscribed.remove(node);
   }
 
 }
@@ -177,8 +179,8 @@ class BevValueNode extends SimpleNode {
       }
       _myParent = tmp;
       _client = tmp.client;
-      _myParent.addSubscribed(this);
     }
+    _myParent.addSubscribed(this);
 
     getData();
   }
