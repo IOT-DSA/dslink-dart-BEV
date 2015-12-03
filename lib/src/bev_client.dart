@@ -76,7 +76,6 @@ class BevClient {
   Future<List> _getData(String url) async {
     var uri = Uri.parse('${rootUri.toString()}$url');
     var jsonMap = await _getRequest(uri);
-
     return jsonMap['datapoints'];
   }
 
@@ -150,7 +149,6 @@ class BevClient {
   void _sendRequests() {
     _requestPending = true;
     var pollFor = (_pendingRequests.length < 15 ? _pendingRequests.length : 15);
-    print('PollFor: $pollFor');
     if (pollFor == 0) {
       _requestPending = false;
       return;
