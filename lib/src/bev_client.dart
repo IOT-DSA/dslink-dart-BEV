@@ -53,14 +53,24 @@ class BevClient {
   /// Add request to [url] to the current Request Queue. Returns a Future<List>
   /// Which will be the results from the request when completed.
   /// This adds requests to a queue to possible be batch processed with other
-  /// requests
-  Future<List> queueRequest(String url) {
+  /// requests. Optional [now] argument will trigger requests to send immediately
+  /// (default), if false, it will wait for another queueRequest with [now] set
+  /// to true, or a call to [triggerRequests]
+  Future<List> queueRequest(String url, {bool now: true}) {
     var pr = new PendingRequest(url);
     _pendingRequests.add(pr);
-    if (_requestPending == false) {
+    if (now && !_requestPending) {
       _sendRequests();
     }
     return pr.done;
+  }
+
+  /// Start requests if there are waiting in the queue and no request is
+  /// currently pending.
+  void triggerRequests() {
+    if (!_requestPending) {
+      _sendRequests();
+    }
   }
 
   Future<List> _getData(String url) async {
@@ -140,6 +150,7 @@ class BevClient {
   void _sendRequests() {
     _requestPending = true;
     var pollFor = (_pendingRequests.length < 15 ? _pendingRequests.length : 15);
+    print('PollFor: $pollFor');
     if (pollFor == 0) {
       _requestPending = false;
       return;

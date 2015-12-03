@@ -144,7 +144,7 @@ class BevNode extends SimpleNode {
       if (el.isQueued) continue;
 
       el.isQueued = true;
-      waitFor.add(client.queueRequest(el.id).then((result) {
+      waitFor.add(client.queueRequest(el.id, now: false).then((result) {
         if (result.isEmpty) {
           el.receiveData(null);
         } else {
@@ -153,6 +153,7 @@ class BevNode extends SimpleNode {
       })
       );
     }
+    client.triggerRequests();
 
     Future.wait(waitFor).then((_) {
       _isRefreshing = false;
