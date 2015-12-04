@@ -18,7 +18,8 @@ class BevClient {
   /// Root URI for requests. Each requested is appended to this value.
   final Uri rootUri;
 
-  bool _requestPending = false;
+  int _requestPending = 0;
+  static const maxRequestPending = 2;
   HttpClient _client;
   HttpClientDigestCredentials _auth;
   List<String> _dataPoints;
@@ -59,7 +60,7 @@ class BevClient {
   Future<List> queueRequest(String url, {bool now: true}) {
     var pr = new PendingRequest(url);
     _pendingRequests.add(pr);
-    if (now && !_requestPending) {
+    if (now) {
       _sendRequests();
     }
     return pr.done;
@@ -68,9 +69,7 @@ class BevClient {
   /// Start requests if there are waiting in the queue and no request is
   /// currently pending.
   void triggerRequests() {
-    if (!_requestPending) {
-      _sendRequests();
-    }
+    _sendRequests();
   }
 
   Future<List> _getData(String url) async {
@@ -106,7 +105,6 @@ class BevClient {
     HttpClientRequest req;
     HttpClientResponse resp;
     String body;
-
     try {
       req = await _client.getUrl(uri);
       resp = await req.close();
@@ -147,16 +145,17 @@ class BevClient {
   }
 
   void _sendRequests() {
-    _requestPending = true;
+    if (_requestPending >= maxRequestPending) return;
+    _requestPending += 1;
     var pollFor = (_pendingRequests.length < 15 ? _pendingRequests.length : 15);
     if (pollFor == 0) {
-      _requestPending = false;
+      _requestPending -= 1;
       return;
     } else if (pollFor == 1) {
       var pr = _pendingRequests.removeFirst();
       _getData(pr.url).then((result) {
+        _requestPending -= 1;
         pr._completer.complete(result);
-        _sendRequests();
       });
     } else {
       List pendingList = [];
@@ -164,15 +163,16 @@ class BevClient {
         pendingList.add(_pendingRequests.removeFirst());
       }
       _getBatchData(pendingList.map((el) => el.url)).then((List<Map> results) {
+        _requestPending -= 1;
         for (PendingRequest pr in pendingList) {
-          var map = results.where((Map m) => m['id'] == pr.url).toList();
+          var map = results.where((Map m) => (m['id'] as String).replaceAll(',', '%2C') == pr.url).toList();
           pr._completer.complete(map);
         }
-
-        _sendRequests();
       });
     }
-
+    if (_requestPending < maxRequestPending) {
+      _sendRequests();
+    }
   }
 
   /// Force the connection to close.
