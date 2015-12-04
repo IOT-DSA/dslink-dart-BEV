@@ -13,8 +13,10 @@ class BevClient {
 
   /// HTTP Digest Authentication Username
   final String username;
+
   /// HTTP Digest Authentication Username
   final String password;
+
   /// Root URI for requests. Each requested is appended to this value.
   final Uri rootUri;
 
@@ -22,6 +24,7 @@ class BevClient {
   static const maxRequestPending = 2;
   HttpClient _client;
   HttpClientDigestCredentials _auth;
+  Cookie _cookie;
   List<String> _dataPoints;
   Queue<PendingRequest> _pendingRequests;
 
@@ -89,7 +92,7 @@ class BevClient {
   /// [value] will be sent with ContentType Application/json; charset=utf-8.
   /// Returns a future list of map values for the response.
   Future<List> setData(String url, dynamic value) async {
-    var body = JSON.encode({'value' : value});
+    var body = JSON.encode({'value': value});
     var uri = Uri.parse('${rootUri.toString()}$url');
     var map = await _setRequest(uri, body);
     return map['datapoints'];
@@ -98,20 +101,34 @@ class BevClient {
   BevClient updateClient(String username, String password, Uri uri) {
     close();
     _cache.remove(rootUri.toString());
-    return new BevClient(username,password, uri);
+    return new BevClient(username, password, uri);
   }
 
   Future<Map> _getRequest(Uri uri) async {
     HttpClientRequest req;
     HttpClientResponse resp;
     String body;
+    Cookie cookie;
+    var sw = new Stopwatch();
+    sw.start();
     try {
       req = await _client.getUrl(uri);
+      if (_cookie != null) {
+        req.cookies.add(_cookie);
+      }
       resp = await req.close();
+      cookie = resp.cookies.firstWhere((c) => c.name == 'JSESSIONID',
+          orElse: () => null);
+      if (cookie != null) {
+        _cookie = cookie;
+      }
+      sw.stop();
       body = await resp.transform(UTF8.decoder).join();
     } on HttpException catch (e) {
       logger.warning('Unable to connect to: $uri', e);
       return {'datapoints': []};
+    } finally {
+      logger.fine('Request duration: ${sw.elapsedMilliseconds}ms');
     }
 
     Map result;
@@ -165,7 +182,10 @@ class BevClient {
       _getBatchData(pendingList.map((el) => el.url)).then((List<Map> results) {
         _requestPending -= 1;
         for (PendingRequest pr in pendingList) {
-          var map = results.where((Map m) => (m['id'] as String).replaceAll(',', '%2C') == pr.url).toList();
+          var map = results
+              .where((Map m) =>
+                  (m['id'] as String).replaceAll(',', '%2C') == pr.url)
+              .toList();
           pr._completer.complete(map);
         }
       });
