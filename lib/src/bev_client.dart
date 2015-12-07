@@ -24,7 +24,7 @@ class BevClient {
   static const maxRequestPending = 2;
   HttpClient _client;
   HttpClientDigestCredentials _auth;
-  Cookie _cookie;
+  List<Cookie> _cookie;
   List<String> _dataPoints;
   Queue<PendingRequest> _pendingRequests;
 
@@ -108,19 +108,16 @@ class BevClient {
     HttpClientRequest req;
     HttpClientResponse resp;
     String body;
-    Cookie cookie;
     var sw = new Stopwatch();
     sw.start();
     try {
       req = await _client.getUrl(uri);
-      if (_cookie != null) {
-        req.cookies.add(_cookie);
+      if (_cookie != null && _cookie.isNotEmpty) {
+        req.cookies.addAll(_cookie);
       }
       resp = await req.close();
-      cookie = resp.cookies.firstWhere((c) => c.name == 'JSESSIONID',
-          orElse: () => null);
-      if (cookie != null) {
-        _cookie = cookie;
+      if (resp.cookies != null && resp.cookies.isNotEmpty) {
+        _cookie = resp.cookies.toList(growable: false);
       }
       sw.stop();
       body = await resp.transform(UTF8.decoder).join();
