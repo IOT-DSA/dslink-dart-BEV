@@ -124,6 +124,9 @@ class BevClient {
     } on HttpException catch (e) {
       logger.warning('Unable to connect to: $uri', e);
       return {'datapoints': []};
+    } on SocketException catch (e) {
+      logger.warning('Unable to connect to: $uri', e);
+      return {'datapoints': []};
     } finally {
       logger.fine('Request duration: ${sw.elapsedMilliseconds}ms');
     }

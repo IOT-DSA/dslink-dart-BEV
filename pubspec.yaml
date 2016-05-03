@@ -1,5 +1,6 @@
 name: dslink_bev
 description: Belimo Energy Valve DSLink
 dependencies:
-  dslink: ^0.5.4
+  dslink:
+    git: https://github.com/IOT-DSA/sdk-dslink-dart.git
 
