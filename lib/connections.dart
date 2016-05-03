@@ -2,6 +2,7 @@ library dslink.bev.connections;
 
 import 'dart:async';
 
+import 'package:dslink/dslink.dart';
 import 'package:dslink/responder.dart';
 import 'package:dslink/nodes.dart' show NodeNamer;
 import 'package:dslink/utils.dart';

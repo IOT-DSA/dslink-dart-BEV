@@ -13,6 +13,10 @@ class BevNode extends SimpleNode {
     EditConnectionNode.pathName() : EditConnectionNode.definition(url, parameters)
   };
 
+  @override
+  String get disconnected => _discoTs;
+
+  String _discoTs;
   String _username;
   String _password;
   String _rootUri;
@@ -31,6 +35,13 @@ class BevNode extends SimpleNode {
 
   @override
   void onCreated() {
+    void addIfMissing(String path, Map node) {
+      var nd = provider.getNode(path);
+      if (nd == null) {
+        provider.addNode(path, node);
+      }
+    }
+
     _username = getConfig(r'$$bev_user');
     _password = getConfig(r'$$bev_pass');
     _rootUri = getConfig(r'$$bev_url');
@@ -40,6 +51,19 @@ class BevNode extends SimpleNode {
       refreshTimer =
           new Timer.periodic(new Duration(seconds: _refreshRate), _refreshData);
     }
+
+    var params = {
+      'username': _username,
+      'password': _password,
+      'refreshRate': _refreshRate
+    };
+
+    addIfMissing('$path/${EditConnectionNode.pathName()}',
+        EditConnectionNode.definition(_rootUri, params));
+    addIfMissing('$path/${RemoveConnectionNode.pathName()}',
+        RemoveConnectionNode.definition());
+    addIfMissing('$path/${RefreshConnectionNode.pathName()}',
+        RefreshConnectionNode.definition());
 
     client = new BevClient(_username, _password, Uri.parse(_rootUri));
     loadData();
@@ -110,6 +134,9 @@ class BevNode extends SimpleNode {
     var data = await client.getDatapoints(force: force);
     if (data == null || data.length < 1) {
       logger.warning('Unable to get datapoints from: $_rootUri');
+//      _discoTs = '${new DateTime.now().toIso8601String()}'
+//                  '${ValueUpdate.TIME_ZONE}';
+//      this.updateList(r'$disconnectedTs');
       client.close();
       var myChildren = children.keys.toList();
       for (var child in myChildren) {
